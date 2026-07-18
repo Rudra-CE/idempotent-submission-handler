@@ -1,29 +1,27 @@
-version: '3.8'
-
 services:
   # ---- Service 1: Our Node.js App ----
   app:
-    build: .                          # Build from the Dockerfile in current folder
+    build: . # Build from the Dockerfile in current folder
     container_name: submission-app
     ports:
-      - "3000:3000"                   # Map port 3000 on your PC to port 3000 in container
+      - "3000:3000" # Map port 3000 on your PC to port 3000 in container
     environment:
-      - REDIS_URL=redis://redis:6379  # "redis" is the name of the service below
+      - REDIS_URL=redis://redis:6379 # "redis" is the name of the service below
       - TTL_SECONDS=60
       - PORT=3000
     depends_on:
       redis:
-        condition: service_healthy    # Wait for Redis to be ready before starting app
+        condition: service_healthy # Wait for Redis to be ready before starting app
     restart: on-failure
 
   # ---- Service 2: Redis ----
   redis:
-    image: redis:7-alpine             # Official Redis image (lightweight)
+    image: redis:7-alpine # Official Redis image (lightweight)
     container_name: submission-redis
     ports:
-      - "6379:6379"                   # Expose Redis port (useful for debugging)
+      - "6379:6379" # Expose Redis port (useful for debugging)
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]  # Check Redis is alive
+      test: [ "CMD", "redis-cli", "ping" ] # Check Redis is alive
       interval: 5s
       timeout: 3s
       retries: 5

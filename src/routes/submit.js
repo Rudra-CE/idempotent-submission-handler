@@ -61,11 +61,11 @@ router.post('/', async (req, res) => {
         };
         // --- END OF BUSINESS LOGIC ---
 
-        // Step 6: Store the result in Redis
-        // SET key value NX EX <seconds>
-        //   NX = only set if Not eXists (safety net — prevents race conditions)
-        //   EX = expire after TTL seconds
-        await redis.set(redisKey, JSON.stringify(submissionResult), 'EX', TTL);
+        // Step 6: Store the result in Redis using SET NX EX
+        //   NX = only set if Not eXists — atomic safety net against race conditions
+        //       (if two requests arrive at the same millisecond, only ONE will set the key)
+        //   EX = expire after TTL seconds (auto-delete)
+        await redis.set(redisKey, JSON.stringify(submissionResult), 'NX', 'EX', TTL);
 
         console.log(`💾 Result stored in Redis for ${TTL} seconds`);
 
