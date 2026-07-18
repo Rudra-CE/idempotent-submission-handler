@@ -7,8 +7,8 @@ services:
       - "3000:3000" # Map port 3000 on your PC to port 3000 in container
     environment:
       - REDIS_URL=redis://redis:6379 # "redis" is the name of the service below
-      - TTL_SECONDS=60
-      - PORT=3000
+      - TTL_SECONDS=${TTL_SECONDS:-10} # reads from .env file (fallback: 10)
+      - PORT=${PORT:-3000} # reads from .env file (fallback: 3000)
     depends_on:
       redis:
         condition: service_healthy # Wait for Redis to be ready before starting app
