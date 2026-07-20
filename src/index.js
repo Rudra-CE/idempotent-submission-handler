@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const path = require('path');
 const submitRoute = require('./routes/submit');
 
 const app = express();
@@ -10,14 +11,8 @@ const PORT = process.env.PORT || 3000;
 // Middleware: parse incoming JSON request bodies
 app.use(express.json());
 
-// Health check route — visit http://localhost:3000/ to confirm app is running
-app.get('/', (req, res) => {
-    res.json({
-        message: '🚀 Idempotent Submission Handler is running!',
-        usage: 'POST /submit with header Idempotency-Key: <your-unique-key>',
-        ttl: `Requests are cached for ${process.env.TTL_SECONDS || 60} seconds`,
-    });
-});
+// Serve the payment demo UI from the /public folder
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Mount the submit route
 app.use('/submit', submitRoute);
@@ -30,5 +25,6 @@ app.use((req, res) => {
 // Start the server
 app.listen(PORT, () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
-    console.log(`📋 Try: POST http://localhost:${PORT}/submit`);
+    console.log(`🌐 Open the demo UI at: http://localhost:${PORT}`);
+    console.log(`📋 API: POST http://localhost:${PORT}/submit`);
 });

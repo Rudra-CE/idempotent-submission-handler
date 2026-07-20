@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafePay — Idempotent Payment Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0f1e;
+      --card: #111827;
+      --card2: #1a2235;
+      --border: #1f2d45;
+      --green: #10b981;
+      --green-dim: #064e3b;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .header .logo {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #10b981, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* Layout */
+    .layout {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      max-width: 960px;
+      align-items: flex-start;
+    }
+    @media(max-width: 700px) { .layout { flex-direction: column; } }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* Payment Form */
+    .form-card { flex: 0 0 380px; }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .field input, .field select {
+      width: 100%;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--blue); }
+
+    .amount-wrap { position: relative; }
+    .amount-wrap span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 15px; }
+    .amount-wrap input { padding-left: 28px; }
+
+    .key-wrap { position: relative; }
+    .key-wrap input { padding-right: 90px; font-size: 12px; font-family: monospace; color: var(--muted); }
+    .key-wrap button {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--muted); border-radius: 6px; padding: 4px 10px;
+      font-size: 11px; cursor: pointer; transition: all 0.2s;
+    }
+    .key-wrap button:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* Buttons */
+    .btn-pay {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .btn-pay:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16,185,129,0.35); }
+    .btn-pay:active { transform: translateY(0); }
+    .btn-pay:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-retry {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--yellow);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--yellow);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+    .btn-retry:hover { background: rgba(245,158,11,0.1); }
+    .btn-retry:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-reset {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+    .btn-reset:hover { border-color: var(--red); color: var(--red); }
+
+    /* Network simulation */
+    .network-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .network-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .network-dot.offline { background: var(--red); animation: none; }
+
+    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 20px; margin-left: auto; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: var(--green-dim); border-radius: 20px; cursor: pointer; transition: 0.2s; }
+    .slider:before { content:''; position:absolute; width:14px; height:14px; left:3px; bottom:3px; background:white; border-radius:50%; transition:0.2s; }
+    input:checked + .slider { background: var(--red); }
+    input:checked + .slider:before { transform: translateX(18px); }
+
+    /* Log */
+    .log-card { flex: 1; }
+    .log-empty { color: var(--muted); font-size: 14px; text-align: center; padding: 40px 0; }
+
+    .log-item {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      animation: fadeIn 0.3s ease;
+      border-left: 3px solid var(--border);
+    }
+    .log-item.fresh { border-left-color: var(--blue); }
+    .log-item.cached { border-left-color: var(--green); }
+    .log-item.error { border-left-color: var(--red); }
+    .log-item.network-err { border-left-color: var(--yellow); }
+
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+
+    .log-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .log-num { font-size: 11px; color: var(--muted); }
+    .log-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .badge-fresh { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .badge-cached { background: rgba(16,185,129,0.15); color: var(--green); }
+    .badge-error { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-network { background: rgba(245,158,11,0.15); color: var(--yellow); }
+
+    .log-row { display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px; }
+    .log-label { color: var(--muted); }
+    .log-val { font-family: monospace; font-size: 12px; color: var(--text); text-align:right; max-width:60%; word-break:break-all; }
+
+    /* Spinner */
+    .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:8px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* Explainer */
+    .explainer {
+      max-width: 960px; width: 100%;
+      margin-top: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+    }
+    .explainer h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+    .steps { display: flex; gap: 16px; flex-wrap: wrap; }
+    .step { flex: 1; min-width: 180px; background: var(--card2); border-radius: 10px; padding: 14px; border: 1px solid var(--border); }
+    .step .num { font-size: 11px; color: var(--green); font-weight: 700; margin-bottom: 6px; }
+    .step .title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .step .desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">🏦 SafePay</div>
+    <p>Idempotent Payment Demo — showing how duplicate submissions are safely handled</p>
+  </div>
+
+  <div class="layout">
+
+    <!-- Payment Form -->
+    <div class="card form-card">
+      <div class="card-title">💳 Payment Details</div>
+
+      <!-- Network Status Toggle -->
+      <div class="network-bar">
+        <div class="network-dot" id="netDot"></div>
+        <span id="netLabel">Network: Online</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="networkToggle" onchange="toggleNetwork()">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="field">
+        <label>Recipient Name</label>
+        <input type="text" id="name" value="Alice" placeholder="Enter name" />
+      </div>
+
+      <div class="field">
+        <label>Amount (₹)</label>
+        <div class="amount-wrap">
+          <span>₹</span>
+          <input type="number" id="amount" value="500" min="1" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Idempotency Key <span style="color:var(--muted);font-size:11px;">(auto-generated per session)</span></label>
+        <div class="key-wrap">
+          <input type="text" id="idempKey" readonly />
+          <button onclick="newKey()">New Key</button>
+        </div>
+      </div>
+
+      <button class="btn-pay" id="btnPay" onclick="submitPayment()">
+        ✅ Pay Now
+      </button>
+
+      <button class="btn-retry" id="btnRetry" onclick="retryPayment()" disabled>
+        🔄 Retry Payment (same key)
+      </button>
+
+      <button class="btn-reset" onclick="resetAll()">
+        🗑 Reset / New Transaction
+      </button>
+    </div>
+
+    <!-- Request Log -->
+    <div class="card log-card">
+      <div class="card-title">📋 Request History</div>
+      <div id="logContainer">
+        <div class="log-empty">No requests yet.<br/>Click "Pay Now" to start.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- How It Works -->
+  <div class="explainer">
+    <h3>⚙️ How Idempotency Works</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="num">STEP 1</div>
+        <div class="title">First Payment</div>
+        <div class="desc">Sent with a unique key. Server processes payment and saves result in Redis for 60s.</div>
+      </div>
+      <div class="step">
+        <div class="num">STEP 2</div>
+        <div class="title">Network Drops</div>
+        <div class="desc">Toggle the network switch above to simulate a connection failure mid-payment.</div>
+      </div>
+      <div class="step">
+        <div class="num">STEP 3</div>
+        <div class="title">User Retries</div>
+        <div class="desc">Click "Retry Payment". Same Idempotency-Key is sent again.</div>
+      </div>
+      <div class="step">
+        <div class="num">STEP 4</div>
+        <div class="title">Safe Response</div>
+        <div class="desc">Server detects duplicate key → returns cached result. <strong>No double payment!</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let requestCount = 0;
+    let currentKey = '';
+    let networkOffline = false;
+    let lastRequestWasNetworkError = false;
+
+    // Generate UUID
+    function uuid() {
+      return 'xxxxxxxx-xxxx-4xxx'.replace(/[xy]/g, c => {
+        const r = Math.random()*16|0;
+        return (c === 'x' ? r : (r&0x3|0x8)).toString(16);
+      });
+    }
+
+    function newKey() {
+      currentKey = 'pay-' + uuid();
+      document.getElementById('idempKey').value = currentKey;
+      document.getElementById('btnRetry').disabled = true;
+      lastRequestWasNetworkError = false;
+    }
+
+    function toggleNetwork() {
+      networkOffline = document.getElementById('networkToggle').checked;
+      const dot = document.getElementById('netDot');
+      const label = document.getElementById('netLabel');
+      if (networkOffline) {
+        dot.classList.add('offline');
+        label.textContent = 'Network: OFFLINE (simulated)';
+      } else {
+        dot.classList.remove('offline');
+        label.textContent = 'Network: Online';
+      }
+    }
+
+    function addLog(type, data) {
+      requestCount++;
+      const container = document.getElementById('logContainer');
+
+      // Remove empty message
+      const empty = container.querySelector('.log-empty');
+      if (empty) empty.remove();
+
+      const item = document.createElement('div');
+      item.className = `log-item ${type}`;
+
+      const badgeMap = {
+        fresh: '<span class="log-badge badge-fresh">🆕 FRESH — Processed</span>',
+        cached: '<span class="log-badge badge-cached">✅ CACHED — Duplicate Blocked</span>',
+        error: '<span class="log-badge badge-error">❌ Error</span>',
+        'network-err': '<span class="log-badge badge-network">⚡ Network Error (Simulated)</span>',
+      };
+
+      item.innerHTML = `
+        <div class="log-header">
+          <span class="log-num">Request #${requestCount}</span>
+          ${badgeMap[type]}
+        </div>
+        ${Object.entries(data).map(([k,v]) => `
+          <div class="log-row">
+            <span class="log-label">${k}</span>
+            <span class="log-val">${v}</span>
+          </div>
+        `).join('')}
+      `;
+
+      container.prepend(item);
+    }
+
+    async function submitPayment(isRetry = false) {
+      const name = document.getElementById('name').value.trim();
+      const amount = document.getElementById('amount').value;
+      const key = document.getElementById('idempKey').value;
+
+      if (!name || !amount) return alert('Please fill in name and amount!');
+      if (!key) return alert('Please generate an Idempotency Key!');
+
+      // Simulate network offline
+      if (networkOffline) {
+        addLog('network-err', {
+          'Idempotency-Key': key,
+          'Status': 'Request failed — network offline',
+          'Advice': 'Turn network back ON and click Retry'
+        });
+        document.getElementById('btnRetry').disabled = false;
+        lastRequestWasNetworkError = true;
+        return;
+      }
+
+      // Disable button, show loading
+      const btn = document.getElementById(isRetry ? 'btnRetry' : 'btnPay');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Sending...`;
+
+      try {
+        const res = await fetch('/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': key,
+          },
+          body: JSON.stringify({ name, amount: Number(amount) }),
+        });
+
+        const data = await res.json();
+
+        if (data.cached) {
+          addLog('cached', {
+            'Idempotency-Key': key,
+            'Transaction ID': data.transactionId,
+            'Processed At': new Date(data.processedAt).toLocaleTimeString(),
+            'Result': '✅ Duplicate blocked! Same result returned.',
+          });
+        } else {
+          addLog('fresh', {
+            'Idempotency-Key': key,
+            'Transaction ID': data.transactionId,
+            'Processed At': new Date(data.processedAt).toLocaleTimeString(),
+            'Recipient': data.submittedData?.name,
+            'Amount': '₹' + data.submittedData?.amount,
+          });
+          document.getElementById('btnRetry').disabled = false;
+        }
+
+      } catch (err) {
+        addLog('error', { 'Error': err.message });
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+
+    function retryPayment() {
+      submitPayment(true);
+    }
+
+    function resetAll() {
+      document.getElementById('logContainer').innerHTML = '<div class="log-empty">No requests yet.<br/>Click "Pay Now" to start.</div>';
+      requestCount = 0;
+      document.getElementById('btnRetry').disabled = true;
+      newKey();
+    }
+
+    // Init
+    newKey();
+  </script>
+
+</body>
+</html>
